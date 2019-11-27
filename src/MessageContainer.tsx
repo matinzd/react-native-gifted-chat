@@ -2,18 +2,18 @@ import PropTypes from 'prop-types'
 import React, { RefObject } from 'react'
 
 import {
-  FlatList,
-  View,
-  StyleSheet,
-  Keyboard,
-  TouchableOpacity,
-  Text,
-  ListViewProps,
-  ListRenderItemInfo,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
-  StyleProp,
-  ViewStyle,
+    FlatList,
+    View,
+    StyleSheet,
+    Keyboard,
+    TouchableOpacity,
+    Text,
+    ListViewProps,
+    ListRenderItemInfo,
+    NativeSyntheticEvent,
+    NativeScrollEvent,
+    StyleProp,
+    ViewStyle,
 } from 'react-native'
 
 import LoadEarlier from './LoadEarlier'
@@ -23,367 +23,376 @@ import { User, IMessage, Reply } from './types'
 import { warning } from './utils'
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  containerAlignTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  contentContainerStyle: {
-    flexGrow: 1,
-    justifyContent: 'flex-start',
-  },
-  headerWrapper: {
-    flex: 1,
-  },
-  listStyle: {
-    flex: 1,
-  },
-  scrollToBottomStyle: {
-    opacity: 0.8,
-    position: 'absolute',
-    right: 10,
-    bottom: 30,
-    zIndex: 999,
-    height: 40,
-    width: 40,
-    borderRadius: 20,
-    backgroundColor: Color.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: Color.black,
-    shadowOpacity: 0.5,
-    shadowOffset: { width: 0, height: 0 },
-    shadowRadius: 1,
-  },
+    container: {
+        flex: 1,
+    },
+    containerAlignTop: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+    },
+    contentContainerStyle: {
+        flexGrow: 1,
+        justifyContent: 'flex-start',
+    },
+    headerWrapper: {
+        flex: 1,
+    },
+    listStyle: {
+        flex: 1,
+    },
+    scrollToBottomStyle: {
+        opacity: 0.8,
+        position: 'absolute',
+        right: 10,
+        bottom: 30,
+        zIndex: 999,
+        height: 40,
+        width: 40,
+        borderRadius: 20,
+        backgroundColor: Color.white,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: Color.black,
+        shadowOpacity: 0.5,
+        shadowOffset: { width: 0, height: 0 },
+        shadowRadius: 1,
+    },
 })
 
 export interface MessageContainerProps<TMessage extends IMessage> {
-  messages?: TMessage[]
-  user?: User
-  listViewProps: Partial<ListViewProps>
-  inverted?: boolean
-  loadEarlier?: boolean
-  alignTop?: boolean
-  scrollToBottom?: boolean
-  scrollToBottomStyle?: StyleProp<ViewStyle>
-  invertibleScrollViewProps?: any
-  extraData?: any
-  scrollToBottomOffset?: number
-  forwardRef?: RefObject<FlatList<IMessage>>
-  renderChatEmpty?(): React.ReactNode
-  renderFooter?(props: MessageContainerProps<TMessage>): React.ReactNode
-  renderMessage?(props: Message['props']): React.ReactNode
-  renderLoadEarlier?(props: LoadEarlier['props']): React.ReactNode
-  scrollToBottomComponent?(): React.ReactNode
-  onLoadEarlier?(): void
-  onQuickReply?(replies: Reply[]): void
+    messages?: TMessage[]
+    user?: User
+    listViewProps: Partial<ListViewProps>
+    inverted?: boolean
+    loadEarlier?: boolean
+    alignTop?: boolean
+    scrollToBottom?: boolean
+    scrollToBottomStyle?: StyleProp<ViewStyle>
+    invertibleScrollViewProps?: any
+    extraData?: any
+    scrollToBottomOffset?: number
+    forwardRef?: RefObject<FlatList<IMessage>>
+    renderChatEmpty?(): React.ReactNode
+    renderFooter?(props: MessageContainerProps<TMessage>): React.ReactNode
+    renderMessage?(props: Message['props']): React.ReactNode
+    renderLoadEarlier?(props: LoadEarlier['props']): React.ReactNode
+    scrollToBottomComponent?(): React.ReactNode
+    onViewableMessagesChanged?(viewableMessages: Array<ViewToken>): void
+    onLoadEarlier?(): void
+    onQuickReply?(replies: Reply[]): void
 }
 
 interface State {
-  showScrollBottom: boolean
+    showScrollBottom: boolean
 }
 
 export default class MessageContainer<
-  TMessage extends IMessage = IMessage
-> extends React.PureComponent<MessageContainerProps<TMessage>, State> {
-  static defaultProps = {
-    messages: [],
-    user: {},
-    renderChatEmpty: null,
-    renderFooter: null,
-    renderMessage: null,
-    onLoadEarlier: () => {},
-    onQuickReply: () => {},
-    inverted: true,
-    loadEarlier: false,
-    listViewProps: {},
-    invertibleScrollViewProps: {},
-    extraData: null,
-    scrollToBottom: false,
-    scrollToBottomOffset: 200,
-    alignTop: false,
-    scrollToBottomStyle: {},
-  }
-
-  static propTypes = {
-    messages: PropTypes.arrayOf(PropTypes.object),
-    user: PropTypes.object,
-    renderChatEmpty: PropTypes.func,
-    renderFooter: PropTypes.func,
-    renderMessage: PropTypes.func,
-    renderLoadEarlier: PropTypes.func,
-    onLoadEarlier: PropTypes.func,
-    listViewProps: PropTypes.object,
-    inverted: PropTypes.bool,
-    loadEarlier: PropTypes.bool,
-    invertibleScrollViewProps: PropTypes.object,
-    extraData: PropTypes.object,
-    scrollToBottom: PropTypes.bool,
-    scrollToBottomOffset: PropTypes.number,
-    scrollToBottomComponent: PropTypes.func,
-    alignTop: PropTypes.bool,
-  }
-
-  state = {
-    showScrollBottom: false,
-  }
-
-  componentDidMount() {
-    if (this.props.messages && this.props.messages.length === 0) {
-      this.attachKeyboardListeners()
-    }
-  }
-
-  componentWillUnmount() {
-    this.detachKeyboardListeners()
-  }
-
-  componentDidUpdate(prevProps: MessageContainerProps<TMessage>) {
-    if (
-      prevProps.messages &&
-      prevProps.messages.length === 0 &&
-      this.props.messages &&
-      this.props.messages.length > 0
-    ) {
-      this.detachKeyboardListeners()
-    } else if (
-      prevProps.messages &&
-      this.props.messages &&
-      prevProps.messages.length > 0 &&
-      this.props.messages.length === 0
-    ) {
-      this.attachKeyboardListeners()
-    }
-  }
-
-  attachKeyboardListeners = () => {
-    const { invertibleScrollViewProps: invertibleProps } = this.props
-    if (invertibleProps) {
-      Keyboard.addListener(
-        'keyboardWillShow',
-        invertibleProps.onKeyboardWillShow,
-      )
-      Keyboard.addListener('keyboardDidShow', invertibleProps.onKeyboardDidShow)
-      Keyboard.addListener(
-        'keyboardWillHide',
-        invertibleProps.onKeyboardWillHide,
-      )
-      Keyboard.addListener('keyboardDidHide', invertibleProps.onKeyboardDidHide)
-    }
-  }
-
-  detachKeyboardListeners = () => {
-    const { invertibleScrollViewProps: invertibleProps } = this.props
-    Keyboard.removeListener(
-      'keyboardWillShow',
-      invertibleProps.onKeyboardWillShow,
-    )
-    Keyboard.removeListener(
-      'keyboardDidShow',
-      invertibleProps.onKeyboardDidShow,
-    )
-    Keyboard.removeListener(
-      'keyboardWillHide',
-      invertibleProps.onKeyboardWillHide,
-    )
-    Keyboard.removeListener(
-      'keyboardDidHide',
-      invertibleProps.onKeyboardDidHide,
-    )
-  }
-
-  renderFooter = () => {
-    if (this.props.renderFooter) {
-      const footerProps = {
-        ...this.props,
-      }
-      return this.props.renderFooter(footerProps)
-    }
-    return null
-  }
-
-  renderLoadEarlier = () => {
-    if (this.props.loadEarlier === true) {
-      const loadEarlierProps = {
-        ...this.props,
-      }
-      if (this.props.renderLoadEarlier) {
-        return this.props.renderLoadEarlier(loadEarlierProps)
-      }
-      return <LoadEarlier {...loadEarlierProps} />
-    }
-    return null
-  }
-
-  scrollTo(options: { animated?: boolean; offset: number }) {
-    if (this.props.forwardRef && this.props.forwardRef.current && options) {
-      this.props.forwardRef.current.scrollToOffset(options)
-    }
-  }
-
-  scrollToBottom = (animated: boolean = true) => {
-    const { inverted } = this.props
-    if (inverted) {
-      this.scrollTo({ offset: 0, animated })
-    } else {
-      this.props.forwardRef!.current!.scrollToEnd({ animated })
-    }
-  }
-
-  handleOnScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const {
-      nativeEvent: {
-        contentOffset: { y: contentOffsetY },
-        contentSize: { height: contentSizeHeight },
-        layoutMeasurement: { height: layoutMeasurementHeight },
-      },
-    } = event
-    const { scrollToBottomOffset } = this.props
-    if (this.props.inverted) {
-      if (contentOffsetY > scrollToBottomOffset!) {
-        this.setState({ showScrollBottom: true })
-      } else {
-        this.setState({ showScrollBottom: false })
-      }
-    } else {
-      if (
-        contentOffsetY < scrollToBottomOffset! &&
-        contentSizeHeight - layoutMeasurementHeight > scrollToBottomOffset!
-      ) {
-        this.setState({ showScrollBottom: true })
-      } else {
-        this.setState({ showScrollBottom: false })
-      }
-    }
-  }
-
-  renderRow = ({ item, index }: ListRenderItemInfo<TMessage>) => {
-    if (!item._id && item._id !== 0) {
-      warning('GiftedChat: `_id` is missing for message', JSON.stringify(item))
-    }
-    if (!item.user) {
-      if (!item.system) {
-        warning(
-          'GiftedChat: `user` is missing for message',
-          JSON.stringify(item),
-        )
-      }
-      item.user = { _id: 0 }
-    }
-    const { messages, user, inverted, ...restProps } = this.props
-    if (messages && user) {
-      const previousMessage =
-        (inverted ? messages[index + 1] : messages[index - 1]) || {}
-      const nextMessage =
-        (inverted ? messages[index - 1] : messages[index + 1]) || {}
-
-      const messageProps: Message['props'] = {
-        ...restProps,
-        user,
-        key: item._id,
-        currentMessage: item,
-        previousMessage,
-        inverted,
-        nextMessage,
-        position: item.user._id === user._id ? 'right' : 'left',
-      }
-
-      if (this.props.renderMessage) {
-        return this.props.renderMessage(messageProps)
-      }
-      return <Message {...messageProps} />
-    }
-    return null
-  }
-
-  renderChatEmpty = () => {
-    if (this.props.renderChatEmpty) {
-      return this.props.renderChatEmpty()
-    }
-    return <View style={styles.container} />
-  }
-
-  renderHeaderWrapper = () => (
-    <View style={styles.headerWrapper}>{this.renderLoadEarlier()}</View>
-  )
-
-  renderScrollBottomComponent() {
-    const { scrollToBottomComponent } = this.props
-
-    if (scrollToBottomComponent) {
-      return scrollToBottomComponent()
+    TMessage extends IMessage = IMessage
+    > extends React.PureComponent<MessageContainerProps<TMessage>, State> {
+    static defaultProps = {
+        messages: [],
+        user: {},
+        renderChatEmpty: null,
+        renderFooter: null,
+        renderMessage: null,
+        onLoadEarlier: () => { },
+        onQuickReply: () => { },
+        onViewableMessagesChanged: () => { },
+        inverted: true,
+        loadEarlier: false,
+        listViewProps: {},
+        invertibleScrollViewProps: {},
+        extraData: null,
+        scrollToBottom: false,
+        scrollToBottomOffset: 200,
+        alignTop: false,
+        scrollToBottomStyle: {},
     }
 
-    return <Text>V</Text>
-  }
-
-  renderScrollToBottomWrapper() {
-    const propsStyle = this.props.scrollToBottomStyle || {}
-    return (
-      <View style={[styles.scrollToBottomStyle, propsStyle]}>
-        <TouchableOpacity
-          onPress={() => this.scrollToBottom()}
-          hitSlop={{ top: 5, left: 5, right: 5, bottom: 5 }}
-        >
-          {this.renderScrollBottomComponent()}
-        </TouchableOpacity>
-      </View>
-    )
-  }
-
-  onLayoutList = () => {
-    if (
-      !this.props.inverted &&
-      !!this.props.messages &&
-      this.props.messages!.length
-    ) {
-      setTimeout(
-        () => this.scrollToBottom(false),
-        15 * this.props.messages!.length,
-      )
+    static propTypes = {
+        messages: PropTypes.arrayOf(PropTypes.object),
+        user: PropTypes.object,
+        renderChatEmpty: PropTypes.func,
+        renderFooter: PropTypes.func,
+        renderMessage: PropTypes.func,
+        renderLoadEarlier: PropTypes.func,
+        onLoadEarlier: PropTypes.func,
+        listViewProps: PropTypes.object,
+        inverted: PropTypes.bool,
+        loadEarlier: PropTypes.bool,
+        invertibleScrollViewProps: PropTypes.object,
+        extraData: PropTypes.object,
+        scrollToBottom: PropTypes.bool,
+        scrollToBottomOffset: PropTypes.number,
+        scrollToBottomComponent: PropTypes.func,
+        alignTop: PropTypes.bool,
+        onViewableMessagesChanged: PropTypes.func
     }
-  }
 
-  keyExtractor = (item: TMessage) => `${item._id}`
+    state = {
+        showScrollBottom: false,
+    }
 
-  render() {
-    const { inverted } = this.props
-    return (
-      <View
-        style={
-          this.props.alignTop ? styles.containerAlignTop : styles.container
+    componentDidMount() {
+        if (this.props.messages && this.props.messages.length === 0) {
+            this.attachKeyboardListeners()
         }
-      >
-        {this.state.showScrollBottom && this.props.scrollToBottom
-          ? this.renderScrollToBottomWrapper()
-          : null}
-        <FlatList
-          ref={this.props.forwardRef}
-          extraData={this.props.extraData}
-          keyExtractor={this.keyExtractor}
-          enableEmptySections
-          automaticallyAdjustContentInsets={false}
-          inverted={inverted}
-          data={this.props.messages}
-          style={styles.listStyle}
-          contentContainerStyle={styles.contentContainerStyle}
-          renderItem={this.renderRow}
-          {...this.props.invertibleScrollViewProps}
-          ListEmptyComponent={this.renderChatEmpty}
-          ListFooterComponent={
-            inverted ? this.renderHeaderWrapper : this.renderFooter
-          }
-          ListHeaderComponent={
-            inverted ? this.renderFooter : this.renderHeaderWrapper
-          }
-          onScroll={this.handleOnScroll}
-          scrollEventThrottle={100}
-          onLayout={this.onLayoutList}
-          {...this.props.listViewProps}
-        />
-      </View>
+    }
+
+    componentWillUnmount() {
+        this.detachKeyboardListeners()
+    }
+
+    componentDidUpdate(prevProps: MessageContainerProps<TMessage>) {
+        if (
+            prevProps.messages &&
+            prevProps.messages.length === 0 &&
+            this.props.messages &&
+            this.props.messages.length > 0
+        ) {
+            this.detachKeyboardListeners()
+        } else if (
+            prevProps.messages &&
+            this.props.messages &&
+            prevProps.messages.length > 0 &&
+            this.props.messages.length === 0
+        ) {
+            this.attachKeyboardListeners()
+        }
+    }
+
+    attachKeyboardListeners = () => {
+        const { invertibleScrollViewProps: invertibleProps } = this.props
+        if (invertibleProps) {
+            Keyboard.addListener(
+                'keyboardWillShow',
+                invertibleProps.onKeyboardWillShow,
+            )
+            Keyboard.addListener('keyboardDidShow', invertibleProps.onKeyboardDidShow)
+            Keyboard.addListener(
+                'keyboardWillHide',
+                invertibleProps.onKeyboardWillHide,
+            )
+            Keyboard.addListener('keyboardDidHide', invertibleProps.onKeyboardDidHide)
+        }
+    }
+
+    detachKeyboardListeners = () => {
+        const { invertibleScrollViewProps: invertibleProps } = this.props
+        Keyboard.removeListener(
+            'keyboardWillShow',
+            invertibleProps.onKeyboardWillShow,
+        )
+        Keyboard.removeListener(
+            'keyboardDidShow',
+            invertibleProps.onKeyboardDidShow,
+        )
+        Keyboard.removeListener(
+            'keyboardWillHide',
+            invertibleProps.onKeyboardWillHide,
+        )
+        Keyboard.removeListener(
+            'keyboardDidHide',
+            invertibleProps.onKeyboardDidHide,
+        )
+    }
+
+    renderFooter = () => {
+        if (this.props.renderFooter) {
+            const footerProps = {
+                ...this.props,
+            }
+            return this.props.renderFooter(footerProps)
+        }
+        return null
+    }
+
+    renderLoadEarlier = () => {
+        if (this.props.loadEarlier === true) {
+            const loadEarlierProps = {
+                ...this.props,
+            }
+            if (this.props.renderLoadEarlier) {
+                return this.props.renderLoadEarlier(loadEarlierProps)
+            }
+            return <LoadEarlier {...loadEarlierProps} />
+        }
+        return null
+    }
+
+    scrollTo(options: { animated?: boolean; offset: number }) {
+        if (this.props.forwardRef && this.props.forwardRef.current && options) {
+            this.props.forwardRef.current.scrollToOffset(options)
+        }
+    }
+
+    scrollToBottom = (animated: boolean = true) => {
+        const { inverted } = this.props
+        if (inverted) {
+            this.scrollTo({ offset: 0, animated })
+        } else {
+            this.props.forwardRef!.current!.scrollToEnd({ animated })
+        }
+    }
+
+    handleOnScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const {
+            nativeEvent: {
+                contentOffset: { y: contentOffsetY },
+                contentSize: { height: contentSizeHeight },
+                layoutMeasurement: { height: layoutMeasurementHeight },
+            },
+        } = event
+        const { scrollToBottomOffset } = this.props
+        if (this.props.inverted) {
+            if (contentOffsetY > scrollToBottomOffset!) {
+                this.setState({ showScrollBottom: true })
+            } else {
+                this.setState({ showScrollBottom: false })
+            }
+        } else {
+            if (
+                contentOffsetY < scrollToBottomOffset! &&
+                contentSizeHeight - layoutMeasurementHeight > scrollToBottomOffset!
+            ) {
+                this.setState({ showScrollBottom: true })
+            } else {
+                this.setState({ showScrollBottom: false })
+            }
+        }
+    }
+
+    renderRow = ({ item, index }: ListRenderItemInfo<TMessage>) => {
+        if (!item._id && item._id !== 0) {
+            warning('GiftedChat: `_id` is missing for message', JSON.stringify(item))
+        }
+        if (!item.user) {
+            if (!item.system) {
+                warning(
+                    'GiftedChat: `user` is missing for message',
+                    JSON.stringify(item),
+                )
+            }
+            item.user = { _id: 0 }
+        }
+        const { messages, user, inverted, ...restProps } = this.props
+        if (messages && user) {
+            const previousMessage =
+                (inverted ? messages[index + 1] : messages[index - 1]) || {}
+            const nextMessage =
+                (inverted ? messages[index - 1] : messages[index + 1]) || {}
+
+            const messageProps: Message['props'] = {
+                ...restProps,
+                user,
+                key: item._id,
+                currentMessage: item,
+                previousMessage,
+                inverted,
+                nextMessage,
+                position: item.user._id === user._id ? 'right' : 'left',
+            }
+
+            if (this.props.renderMessage) {
+                return this.props.renderMessage(messageProps)
+            }
+            return <Message {...messageProps} />
+        }
+        return null
+    }
+
+    renderChatEmpty = () => {
+        if (this.props.renderChatEmpty) {
+            return this.props.renderChatEmpty()
+        }
+        return <View style={styles.container} />
+    }
+
+    renderHeaderWrapper = () => (
+        <View style={styles.headerWrapper}>{this.renderLoadEarlier()}</View>
     )
-  }
+
+    renderScrollBottomComponent() {
+        const { scrollToBottomComponent } = this.props
+
+        if (scrollToBottomComponent) {
+            return scrollToBottomComponent()
+        }
+
+        return <Text>V</Text>
+    }
+
+    renderScrollToBottomWrapper() {
+        const propsStyle = this.props.scrollToBottomStyle || {}
+        return (
+            <View style={[styles.scrollToBottomStyle, propsStyle]}>
+                <TouchableOpacity
+                    onPress={() => this.scrollToBottom()}
+                    hitSlop={{ top: 5, left: 5, right: 5, bottom: 5 }}
+                >
+                    {this.renderScrollBottomComponent()}
+                </TouchableOpacity>
+            </View>
+        )
+    }
+
+    onLayoutList = () => {
+        if (
+            !this.props.inverted &&
+            !!this.props.messages &&
+            this.props.messages!.length
+        ) {
+            setTimeout(
+                () => this.scrollToBottom(false),
+                15 * this.props.messages!.length,
+            )
+        }
+    }
+
+    onViewableItemsChanged = ({ viewableItems, changed }) => {
+        this.props.onViewableMessagesChanged(viewableItems)
+    }
+
+    keyExtractor = (item: TMessage) => `${item._id}`
+
+    render() {
+        const { inverted } = this.props
+        return (
+            <View
+                style={
+                    this.props.alignTop ? styles.containerAlignTop : styles.container
+                }
+            >
+                {this.state.showScrollBottom && this.props.scrollToBottom
+                    ? this.renderScrollToBottomWrapper()
+                    : null}
+                <FlatList
+                    ref={this.props.forwardRef}
+                    extraData={this.props.extraData}
+                    keyExtractor={this.keyExtractor}
+                    enableEmptySections
+                    onViewableItemsChanged={this.onViewableItemsChanged}
+                    viewabilityConfig={{ itemVisiblePercentThreshold: this.props.itemVisiblePercentThreshold }}
+                    automaticallyAdjustContentInsets={false}
+                    inverted={inverted}
+                    data={this.props.messages}
+                    style={styles.listStyle}
+                    contentContainerStyle={styles.contentContainerStyle}
+                    renderItem={this.renderRow}
+                    {...this.props.invertibleScrollViewProps}
+                    ListEmptyComponent={this.renderChatEmpty}
+                    ListFooterComponent={
+                        inverted ? this.renderHeaderWrapper : this.renderFooter
+                    }
+                    ListHeaderComponent={
+                        inverted ? this.renderFooter : this.renderHeaderWrapper
+                    }
+                    onScroll={this.handleOnScroll}
+                    scrollEventThrottle={100}
+                    onLayout={this.onLayoutList}
+                    {...this.props.listViewProps}
+                />
+            </View>
+        )
+    }
 }
